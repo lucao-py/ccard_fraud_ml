@@ -1,0 +1,17 @@
+{
+  "model_version": "catboost_v1",
+  "algorithm": "CatBoostClassifier",
+  "feature_set": "features_basicas_v1",
+  "split": "temporal_70_15_15",
+  "selection_metric": "average_precision",
+  "validation_average_precision": 0.931645,
+  "validation_roc_auc": 0.996922,
+  "validation_precision": 0.965653,
+  "validation_recall": 0.785942,
+  "validation_f1": 0.866579,
+  "depth": 6,
+  "learning_rate": 0.05,
+  "best_iteration": 718,
+  "tree_count": 719,
+  "random_seed": 42
+}

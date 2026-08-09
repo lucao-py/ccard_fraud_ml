@@ -1,0 +1,23 @@
+{
+  "feature_set": "features_basicas_v1",
+  "feature_order": [
+    "amt_log",
+    "city_pop_log",
+    "idade",
+    "distancia_km",
+    "hora_sin",
+    "hora_cos",
+    "dia_semana_sin",
+    "dia_semana_cos",
+    "fim_de_semana",
+    "category",
+    "gender",
+    "state"
+  ],
+  "categorical_features": [
+    "category",
+    "gender",
+    "state"
+  ],
+  "target": "is_fraud"
+}
