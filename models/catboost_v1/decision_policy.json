@@ -1,0 +1,33 @@
+{
+    "policy_version": "decision_policy_v1",
+    "model_version": "catboost_v1",
+    "threshold_revisao": 0.2,
+    "threshold_alerta_critico": 0.9,
+    "decisoes": {
+        "APROVAR": "score < 0.20",
+        "REVISAR": "0.20 <= score < 0.90",
+        "ALERTA_CRITICO": "score >= 0.90"
+    },
+    "selection_dataset": "validation",
+    "validation_metrics": {
+        "total_transacoes": 194501,
+        "total_fraudes": 1252,
+        "fraudes_detectadas": 1062,
+        "fraudes_perdidas": 190,
+        "recall_global": 0.848243,
+        "total_encaminhado": 1168,
+        "percentual_encaminhado": 0.600511,
+        "revisao": {
+            "quantidade": 357,
+            "fraudes": 255,
+            "legitimas": 102,
+            "taxa_fraude": 0.714286
+        },
+        "alerta_critico": {
+            "quantidade": 811,
+            "fraudes": 807,
+            "legitimas": 4,
+            "taxa_fraude": 0.995068
+        }
+    }
+}

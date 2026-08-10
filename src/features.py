@@ -168,11 +168,10 @@ def construir_features(
     ).astype(int)
 
     # Categóricas
-    for coluna in (
-        FEATURES_CATEGORICAS
-    ):
+    for coluna in FEATURES_CATEGORICAS:
         dados[coluna] = (
             dados[coluna]
+            .astype("string")
             .fillna("__MISSING__")
             .astype(str)
         )

@@ -5,6 +5,8 @@ from catboost import (
     Pool
 )
 
+import pandas as pd
+
 from src.features import (
     construir_features,
     FEATURES_CATEGORICAS
@@ -37,23 +39,42 @@ class FraudModel:
             str(CAMINHO_MODELO)
         )
 
+    def prever_scores(
+            self,
+            transacoes: pd.DataFrame
+        ):
+            """
+            Calcula scores de fraude para uma ou mais transações.
+            """
+
+            features = construir_features(
+                transacoes
+            )
+
+            pool = Pool(
+                data=features,
+                cat_features=FEATURES_CATEGORICAS
+            )
+
+            scores = (
+                self.modelo
+                .predict_proba(pool)[:, 1]
+            )
+
+            return scores
+
     def prever_score(
         self,
-        transacao
+        transacao: pd.DataFrame
     ) -> float:
+        """
+        Calcula o score de fraude para uma única transação.
+        """
 
-        features = construir_features(
+        scores = self.prever_scores(
             transacao
         )
 
-        pool = Pool(
-            data=features,
-            cat_features=FEATURES_CATEGORICAS
+        return float(
+            scores[0]
         )
-
-        score = (
-            self.modelo
-            .predict_proba(pool)[0, 1]
-        )
-
-        return float(score)
