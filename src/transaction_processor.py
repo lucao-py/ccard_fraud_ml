@@ -100,6 +100,46 @@ class TransactionProcessor:
 
         linha = transacao.iloc[0]
 
+        def valor_opcional(
+            coluna
+        ):
+
+            if (
+                coluna not in transacao.columns
+                or pd.isna(linha[coluna])
+            ):
+                return None
+
+            return linha[coluna]
+
+        first = valor_opcional(
+            "first"
+        )
+
+        last = valor_opcional(
+            "last"
+        )
+
+        merchant = valor_opcional(
+            "merchant"
+        )
+
+        category = valor_opcional(
+            "category"
+        )
+
+        amt = valor_opcional(
+            "amt"
+        )
+
+        city = valor_opcional(
+            "city"
+        )
+
+        state = valor_opcional(
+            "state"
+        )
+        
         trans_num = str(
             linha["trans_num"]
         )
@@ -109,7 +149,61 @@ class TransactionProcessor:
                 "trans_date_trans_time"
             ]
         )
+        cc_last4 = None
 
+        cc_num = valor_opcional(
+            "cc_num"
+        )
+
+        if cc_num is not None:
+
+            cc_texto = str(
+                cc_num
+            )
+
+            cc_last4 = (
+                cc_texto[-4:]
+                if len(cc_texto) >= 4
+                else cc_texto
+            )
+        if amt is not None:
+            amt = float(amt)
+
+        first = (
+            str(first)
+            if first is not None
+            else None
+        )
+
+        last = (
+            str(last)
+            if last is not None
+            else None
+        )
+
+        merchant = (
+            str(merchant)
+            if merchant is not None
+            else None
+        )
+
+        category = (
+            str(category)
+            if category is not None
+            else None
+        )
+
+        city = (
+            str(city)
+            if city is not None
+            else None
+        )
+
+        state = (
+            str(state)
+            if state is not None
+            else None
+        )
         is_fraud = None
 
         if (
@@ -124,6 +218,7 @@ class TransactionProcessor:
             )
 
             resultado = {
+
             "run_id":
                 str(run_id),
 
@@ -132,6 +227,30 @@ class TransactionProcessor:
 
             "trans_date_trans_time":
                 trans_date_trans_time,
+
+            "first":
+                first,
+
+            "last":
+                last,
+
+            "merchant":
+                merchant,
+
+            "category":
+                category,
+
+            "amt":
+                amt,
+
+            "city":
+                city,
+
+            "state":
+                state,
+
+            "cc_last4":
+                cc_last4,
 
             "score_fraude":
                 float(score),
@@ -149,23 +268,46 @@ class TransactionProcessor:
         if persistir:
 
             inserido = salvar_resultado(
-                run_id=run_id,
-                trans_num=trans_num,
-                trans_date_trans_time=(
-                    trans_date_trans_time
-                ),
-                score_fraude=score,
-                decisao=decisao,
-                is_fraud=is_fraud,
-                latency_ms=latency_ms,
-                model_version="catboost_v1",
-                policy_version=(
-                    "decision_policy_v1"
-                ),
-                caminho_banco=(
-                    self.caminho_banco
-                )
+
+            run_id=run_id,
+
+            trans_num=trans_num,
+
+            trans_date_trans_time=(
+                trans_date_trans_time
+            ),
+
+            first=first,
+            last=last,
+
+            merchant=merchant,
+            category=category,
+
+            amt=amt,
+
+            city=city,
+            state=state,
+
+            cc_last4=cc_last4,
+
+            score_fraude=score,
+
+            decisao=decisao,
+
+            is_fraud=is_fraud,
+
+            latency_ms=latency_ms,
+
+            model_version="catboost_v1",
+
+            policy_version=(
+                "decision_policy_v1"
+            ),
+
+            caminho_banco=(
+                self.caminho_banco
             )
+        )
 
             resultado[
                 "persistido"

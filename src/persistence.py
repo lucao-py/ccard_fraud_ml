@@ -55,6 +55,47 @@ def conectar_banco(
 
     return conexao
 
+def garantir_colunas_contexto(
+    caminho_banco: Path = DEFAULT_DB_PATH
+) -> None:
+
+    colunas_novas = {
+        "first": "TEXT",
+        "last": "TEXT",
+        "merchant": "TEXT",
+        "category": "TEXT",
+        "amt": "REAL",
+        "city": "TEXT",
+        "state": "TEXT",
+        "cc_last4": "TEXT"
+    }
+
+    with conectar_banco(
+        caminho_banco
+    ) as conexao:
+
+        colunas_existentes = {
+            linha["name"]
+            for linha in conexao.execute(
+                """
+                PRAGMA table_info(
+                    transacoes_processadas
+                )
+                """
+            ).fetchall()
+        }
+
+        for coluna, tipo in colunas_novas.items():
+
+            if coluna not in colunas_existentes:
+
+                conexao.execute(
+                    f"""
+                    ALTER TABLE transacoes_processadas
+                    ADD COLUMN {coluna} {tipo}
+                    """
+                )
+
 
 def inicializar_banco(
     caminho_banco: Path = DEFAULT_DB_PATH
@@ -75,6 +116,22 @@ def inicializar_banco(
                 trans_num TEXT NOT NULL,
 
                 trans_date_trans_time TEXT NOT NULL,
+
+                first TEXT,
+
+                last TEXT,
+
+                merchant TEXT,
+
+                category TEXT,
+
+                amt REAL,
+
+                city TEXT,
+
+                state TEXT,
+
+                cc_last4 TEXT,
 
                 score_fraude REAL NOT NULL
                     CHECK (
@@ -171,6 +228,9 @@ def inicializar_banco(
             )
             """
         )
+    garantir_colunas_contexto(
+    caminho_banco
+    )
     return Path(
         caminho_banco
     )
@@ -181,6 +241,16 @@ def salvar_resultado(
     run_id: str,
     trans_num: str,
     trans_date_trans_time,
+
+    first: str | None = None,
+    last: str | None = None,
+    merchant: str | None = None,
+    category: str | None = None,
+    amt: float | None = None,
+    city: str | None = None,
+    state: str | None = None,
+    cc_last4: str | None = None,
+
     score_fraude: float,
     decisao: str,
     is_fraud: int | None = None,
@@ -188,7 +258,7 @@ def salvar_resultado(
     model_version: str = "catboost_v1",
     policy_version: str = "decision_policy_v1",
     caminho_banco: Path = DEFAULT_DB_PATH
-) -> bool:
+    ) -> bool:
 
     score_fraude = float(
         score_fraude
@@ -239,43 +309,71 @@ def salvar_resultado(
     ) as conexao:
 
         cursor = conexao.execute(
-            """
-            INSERT INTO transacoes_processadas (
-                run_id,
-                trans_num,
-                trans_date_trans_time,
-                score_fraude,
-                decisao,
-                is_fraud,
-                processed_at,
-                latency_ms,
-                model_version,
-                policy_version
-            )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """
+        INSERT INTO transacoes_processadas (
 
-            ON CONFLICT (
-                run_id,
-                trans_num
-            )
-            DO NOTHING
-            """,
+            run_id,
+            trans_num,
+            trans_date_trans_time,
+
+            first,
+            last,
+            merchant,
+            category,
+            amt,
+            city,
+            state,
+            cc_last4,
+
+            score_fraude,
+            decisao,
+            is_fraud,
+            processed_at,
+            latency_ms,
+            model_version,
+            policy_version
+        )
+
+        VALUES (
+            ?, ?, ?,
+            ?, ?, ?, ?, ?, ?, ?, ?,
+            ?, ?, ?, ?, ?, ?, ?
+        )
+
+        ON CONFLICT (
+            run_id,
+            trans_num
+        )
+
+        DO NOTHING
+        """,
+
+        (
+            str(run_id),
+            str(trans_num),
+            data_transacao,
+
+            first,
+            last,
+            merchant,
+            category,
+            amt,
+            city,
+            state,
+            cc_last4,
+
+            score_fraude,
+            decisao,
             (
-                str(run_id),
-                str(trans_num),
-                data_transacao,
-                score_fraude,
-                decisao,
-                (
-                    None
-                    if is_fraud is None
-                    else int(is_fraud)
-                ),
-                processed_at,
-                latency_ms,
-                model_version,
-                policy_version
-            )
+                None
+                if is_fraud is None
+                else int(is_fraud)
+            ),
+            processed_at,
+            latency_ms,
+            model_version,
+            policy_version
+        )
         )
 
         inserido = (
@@ -552,3 +650,4 @@ def buscar_run_replay(
     return dict(
         linha
     )
+
