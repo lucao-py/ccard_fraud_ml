@@ -1092,3 +1092,453 @@ def buscar_resumo_sinalizacoes(
     )
 
     return resultado
+
+# ==========================================================
+# TRANSAÇÕES & ALERTAS
+# ==========================================================
+
+DECISOES_VALIDAS = {
+    "APROVAR",
+    "REVISAR",
+    "ALERTA_CRITICO",
+}
+
+
+def _montar_filtros_transacoes(
+    run_id: str,
+    decisoes: list[str] | tuple[str, ...] | None = None,
+    categoria: str | None = None,
+    estado: str | None = None,
+    busca: str | None = None,
+    score_min: float | None = None,
+    score_max: float | None = None,
+) -> tuple[str, list]:
+
+    """
+    Monta de forma segura a cláusula WHERE utilizada
+    nas consultas da página Transações & Alertas.
+    """
+
+    condicoes = [
+        "run_id = ?"
+    ]
+
+    parametros = [
+        run_id
+    ]
+
+    # ------------------------------------------------------
+    # DECISÃO
+    # ------------------------------------------------------
+
+    if decisoes:
+
+        decisoes = list(
+            decisoes
+        )
+
+        invalidas = (
+            set(decisoes)
+            - DECISOES_VALIDAS
+        )
+
+        if invalidas:
+            raise ValueError(
+                "Decisões inválidas: "
+                + ", ".join(
+                    sorted(invalidas)
+                )
+            )
+
+        placeholders = ", ".join(
+            "?"
+            for _ in decisoes
+        )
+
+        condicoes.append(
+            f"decisao IN ({placeholders})"
+        )
+
+        parametros.extend(
+            decisoes
+        )
+
+    # ------------------------------------------------------
+    # CATEGORIA
+    # ------------------------------------------------------
+
+    if categoria:
+
+        condicoes.append(
+            "category = ?"
+        )
+
+        parametros.append(
+            categoria
+        )
+
+    # ------------------------------------------------------
+    # ESTADO
+    # ------------------------------------------------------
+
+    if estado:
+
+        condicoes.append(
+            "state = ?"
+        )
+
+        parametros.append(
+            estado
+        )
+
+    # ------------------------------------------------------
+    # SCORE
+    # ------------------------------------------------------
+
+    if score_min is not None:
+
+        condicoes.append(
+            "score_fraude >= ?"
+        )
+
+        parametros.append(
+            float(score_min)
+        )
+
+    if score_max is not None:
+
+        condicoes.append(
+            "score_fraude <= ?"
+        )
+
+        parametros.append(
+            float(score_max)
+        )
+
+    # ------------------------------------------------------
+    # BUSCA LIVRE
+    # ------------------------------------------------------
+
+    if busca:
+
+        termo = (
+            f"%{busca.strip()}%"
+        )
+
+        condicoes.append(
+            """
+            (
+                first LIKE ?
+                OR last LIKE ?
+                OR (
+                    COALESCE(first, '')
+                    || ' '
+                    || COALESCE(last, '')
+                ) LIKE ?
+                OR merchant LIKE ?
+                OR trans_num LIKE ?
+                OR cc_last4 LIKE ?
+                OR city LIKE ?
+            )
+            """
+        )
+
+        parametros.extend(
+            [
+                termo,
+                termo,
+                termo,
+                termo,
+                termo,
+                termo,
+                termo,
+            ]
+        )
+
+    where_sql = (
+        " AND ".join(
+            condicoes
+        )
+    )
+
+    return (
+        where_sql,
+        parametros,
+    )
+
+def buscar_transacoes(
+    run_id: str,
+    decisoes: list[str] | tuple[str, ...] | None = None,
+    categoria: str | None = None,
+    estado: str | None = None,
+    busca: str | None = None,
+    score_min: float | None = None,
+    score_max: float | None = None,
+    limite: int = 100,
+    offset: int = 0,
+    caminho_banco: Path = DEFAULT_DB_PATH,
+) -> list[dict]:
+
+    """
+    Consulta transações para a área de investigação.
+
+    Permite filtrar por:
+    - decisão;
+    - categoria;
+    - estado;
+    - texto;
+    - score mínimo;
+    - score máximo.
+
+    A consulta é paginável através de limite + offset.
+    """
+
+    where_sql, parametros = (
+        _montar_filtros_transacoes(
+            run_id=run_id,
+            decisoes=decisoes,
+            categoria=categoria,
+            estado=estado,
+            busca=busca,
+            score_min=score_min,
+            score_max=score_max,
+        )
+    )
+
+    sql = f"""
+        SELECT
+
+            id,
+            run_id,
+
+            trans_num,
+            trans_date_trans_time,
+
+            first,
+            last,
+
+            merchant,
+            category,
+
+            amt,
+
+            city,
+            state,
+
+            cc_last4,
+
+            score_fraude,
+            decisao,
+
+            processed_at,
+            latency_ms
+
+        FROM transacoes_processadas
+
+        WHERE
+            {where_sql}
+
+        ORDER BY
+            id DESC
+
+        LIMIT ?
+        OFFSET ?
+    """
+
+    parametros.extend(
+        [
+            int(limite),
+            int(offset),
+        ]
+    )
+
+    with conectar_banco(
+        caminho_banco
+    ) as conexao:
+
+        linhas = conexao.execute(
+            sql,
+            parametros,
+        ).fetchall()
+
+    return [
+        dict(linha)
+        for linha in linhas
+    ]
+
+def contar_transacoes_filtradas(
+    run_id: str,
+    decisoes: list[str] | tuple[str, ...] | None = None,
+    categoria: str | None = None,
+    estado: str | None = None,
+    busca: str | None = None,
+    score_min: float | None = None,
+    score_max: float | None = None,
+    caminho_banco: Path = DEFAULT_DB_PATH,
+) -> int:
+
+    where_sql, parametros = (
+        _montar_filtros_transacoes(
+            run_id=run_id,
+            decisoes=decisoes,
+            categoria=categoria,
+            estado=estado,
+            busca=busca,
+            score_min=score_min,
+            score_max=score_max,
+        )
+    )
+
+    sql = f"""
+        SELECT
+            COUNT(*) AS total
+
+        FROM transacoes_processadas
+
+        WHERE
+            {where_sql}
+    """
+
+    with conectar_banco(
+        caminho_banco
+    ) as conexao:
+
+        linha = conexao.execute(
+            sql,
+            parametros,
+        ).fetchone()
+
+    return int(
+        linha["total"]
+        or 0
+    )
+
+def buscar_detalhe_transacao(
+    run_id: str,
+    trans_num: str,
+    caminho_banco: Path = DEFAULT_DB_PATH,
+) -> dict | None:
+
+    """
+    Retorna todos os dados operacionais disponíveis
+    para uma transação específica.
+    """
+
+    with conectar_banco(
+        caminho_banco
+    ) as conexao:
+
+        linha = conexao.execute(
+            """
+            SELECT
+
+                id,
+                run_id,
+
+                trans_num,
+                trans_date_trans_time,
+
+                first,
+                last,
+
+                merchant,
+                category,
+
+                amt,
+
+                city,
+                state,
+
+                cc_last4,
+
+                score_fraude,
+                decisao,
+
+                latency_ms,
+                processed_at,
+
+                model_version,
+                policy_version
+
+            FROM transacoes_processadas
+
+            WHERE
+                run_id = ?
+                AND trans_num = ?
+
+            LIMIT 1
+            """,
+            (
+                run_id,
+                trans_num,
+            )
+        ).fetchone()
+
+    if linha is None:
+        return None
+
+    return dict(
+        linha
+    )
+
+def buscar_opcoes_filtros_transacoes(
+    run_id: str,
+    caminho_banco: Path = DEFAULT_DB_PATH,
+) -> dict:
+
+    with conectar_banco(
+        caminho_banco
+    ) as conexao:
+
+        categorias = conexao.execute(
+            """
+            SELECT DISTINCT
+                category
+
+            FROM transacoes_processadas
+
+            WHERE
+                run_id = ?
+                AND category IS NOT NULL
+
+            ORDER BY
+                category
+            """,
+            (run_id,)
+        ).fetchall()
+
+        estados = conexao.execute(
+            """
+            SELECT DISTINCT
+                state
+
+            FROM transacoes_processadas
+
+            WHERE
+                run_id = ?
+                AND state IS NOT NULL
+
+            ORDER BY
+                state
+            """,
+            (run_id,)
+        ).fetchall()
+
+    return {
+
+        "categorias": [
+            linha["category"]
+            for linha in categorias
+        ],
+
+        "estados": [
+            linha["state"]
+            for linha in estados
+        ],
+
+        "decisoes": [
+            "APROVAR",
+            "REVISAR",
+            "ALERTA_CRITICO",
+        ],
+    }
