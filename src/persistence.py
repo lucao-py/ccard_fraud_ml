@@ -67,7 +67,8 @@ def garantir_colunas_contexto(
         "amt": "REAL",
         "city": "TEXT",
         "state": "TEXT",
-        "cc_last4": "TEXT"
+        "cc_last4": "TEXT",
+        "model_features_json": "TEXT"
     }
 
     with conectar_banco(
@@ -132,6 +133,8 @@ def inicializar_banco(
                 state TEXT,
 
                 cc_last4 TEXT,
+
+                model_features_json TEXT,
 
                 score_fraude REAL NOT NULL
                     CHECK (
@@ -234,6 +237,71 @@ def inicializar_banco(
     return Path(
         caminho_banco
     )
+
+
+def limpar_estado_operacional(
+    caminho_banco: Path = DEFAULT_DB_PATH
+) -> None:
+    """Remove dados de runtime e recupera o espaço livre do SQLite."""
+
+    conexao = conectar_banco(
+        caminho_banco
+    )
+
+    try:
+        conexao.execute(
+            "BEGIN IMMEDIATE"
+        )
+
+        # Remove primeiro os registros logicamente dependentes.
+        conexao.execute(
+            "DELETE FROM transacoes_processadas"
+        )
+        conexao.execute(
+            "DELETE FROM replay_runs"
+        )
+        conexao.execute(
+            """
+            DELETE FROM sqlite_sequence
+            WHERE name = 'transacoes_processadas'
+            """
+        )
+
+        conexao.commit()
+
+        checkpoint = conexao.execute(
+            "PRAGMA wal_checkpoint(TRUNCATE)"
+        ).fetchone()
+
+        if checkpoint is not None and int(checkpoint[0]) != 0:
+            raise sqlite3.OperationalError(
+                "O checkpoint do WAL permaneceu ocupado."
+            )
+
+        # VACUUM precisa executar fora de uma transação aberta.
+        conexao.execute(
+            "VACUUM"
+        )
+
+        checkpoint = conexao.execute(
+            "PRAGMA wal_checkpoint(TRUNCATE)"
+        ).fetchone()
+
+        if checkpoint is not None and int(checkpoint[0]) != 0:
+            raise sqlite3.OperationalError(
+                "O checkpoint final do WAL permaneceu ocupado."
+            )
+
+    except Exception as exc:
+        if conexao.in_transaction:
+            conexao.rollback()
+
+        raise RuntimeError(
+            "Não foi possível limpar o estado operacional do banco."
+        ) from exc
+
+    finally:
+        conexao.close()
         
 
 def salvar_resultado(
@@ -250,6 +318,7 @@ def salvar_resultado(
     city: str | None = None,
     state: str | None = None,
     cc_last4: str | None = None,
+    model_features_json: str | None = None,
 
     score_fraude: float,
     decisao: str,
@@ -324,6 +393,7 @@ def salvar_resultado(
             city,
             state,
             cc_last4,
+            model_features_json,
 
             score_fraude,
             decisao,
@@ -336,7 +406,7 @@ def salvar_resultado(
 
         VALUES (
             ?, ?, ?,
-            ?, ?, ?, ?, ?, ?, ?, ?,
+            ?, ?, ?, ?, ?, ?, ?, ?, ?,
             ?, ?, ?, ?, ?, ?, ?
         )
 
@@ -361,6 +431,7 @@ def salvar_resultado(
             city,
             state,
             cc_last4,
+            model_features_json,
 
             score_fraude,
             decisao,
@@ -650,4 +721,3 @@ def buscar_run_replay(
     return dict(
         linha
     )
-

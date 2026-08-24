@@ -159,12 +159,25 @@ class TemporalReplay:
                     sleep(
                         self.intervalo_segundos
                     )
-                finalizar_run_replay(
+
+            finalizar_run_replay(
                 run_id=run_id,
                 caminho_banco=(
                     self.caminho_banco
                 )
             )
+
+        except KeyboardInterrupt:
+
+            falhar_run_replay(
+                run_id=run_id,
+                mensagem="Processamento interrompido.",
+                caminho_banco=(
+                    self.caminho_banco
+                )
+            )
+
+            raise
 
         except Exception as exc:
 
@@ -209,4 +222,4 @@ class TemporalReplay:
                     if tempo_total > 0
                     else None
                 )
-        }        
+        }

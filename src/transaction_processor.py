@@ -56,13 +56,6 @@ class TransactionProcessor:
                 "espera exatamente uma transação."
             )
 
-        if len(transacao) != 1:
-            raise ValueError(
-                "O processamento individual "
-                "espera exatamente uma transacao"
-            )
-
-
         colunas_obrigatorias = {
             "trans_num",
             "trans_date_trans_time"
@@ -80,10 +73,23 @@ class TransactionProcessor:
 
         inicio = perf_counter()
 
-        score = (
+        scores, features_modelo = (
             self.modelo
-            .prever_score(
+            .prever_scores_com_features(
                 transacao
+            )
+        )
+
+        score = float(
+            scores[0]
+        )
+
+        model_features_json = (
+            features_modelo
+            .iloc[0]
+            .to_json(
+                force_ascii=False,
+                double_precision=15
             )
         )
 
@@ -217,7 +223,7 @@ class TransactionProcessor:
                 linha["is_fraud"]
             )
 
-            resultado = {
+        resultado = {
 
             "run_id":
                 str(run_id),
@@ -251,6 +257,9 @@ class TransactionProcessor:
 
             "cc_last4":
                 cc_last4,
+
+            "model_features_json":
+                model_features_json,
 
             "score_fraude":
                 float(score),
@@ -289,6 +298,10 @@ class TransactionProcessor:
             state=state,
 
             cc_last4=cc_last4,
+
+            model_features_json=(
+                model_features_json
+            ),
 
             score_fraude=score,
 

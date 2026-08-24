@@ -1,7 +1,12 @@
-venv
-venv-python39
-raw
+venv/
+venv-python39/
+raw/
 outputs/
 runtime/
-__pycache__
 payments/
+
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ipynb_checkpoints/
+.DS_Store
