@@ -62,12 +62,6 @@ python main.py
 
 The command starts both the transaction processing worker and the Streamlit dashboard.
 
-Stop the application with:
-
-```text
-Ctrl+C
-```
-
 ## Stack
 
 Python, CatBoost, Pandas, NumPy, scikit-learn, SQLite, Streamlit and Plotly.
